@@ -75,11 +75,10 @@ void dmpDataReady() {
 
 /*-----( Declare objects )-----*/
 IRrecv irrecv(IR_RECIEVER);     // create instance of 'irrecv'
-decode_results results;      // create instance of 'decode_results'
 String translateIR() // takes action based on IR code received
 // describing Remote IR codes.
 {
-  switch (results.value) {
+  switch (irrecv.results.value) {
       //IR signal    key on IR remote       //abbreviation of gaits   //gait/posture names
 #ifdef DEVELOPER
 
@@ -145,7 +144,7 @@ String translateIR() // takes action based on IR code received
     case 0xFFFFFFFF: return (""); //Serial.println(" REPEAT");
 
     default: {
-        Serial.println(results.value, HEX);
+        Serial.println(irrecv.results.value, HEX);
       }
       return ("");                      //Serial.println("null");
   }// End Case
@@ -185,6 +184,8 @@ void checkBodyMotion()  {
   //while (!mpuInterrupt && fifoCount < packetSize) ;
   if (mpuInterrupt || fifoCount >= packetSize)
   {
+    if (mpuInterrupt)
+      Serial.println("Interrupt");
     // reset interrupt flag and get INT_STATUS byte
     mpuInterrupt = false;
     mpuIntStatus = mpu.getIntStatus();
@@ -288,7 +289,7 @@ void setup() {
   // join I2C bus (I2Cdev library doesn't do this automatically)
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
   Wire.begin();
-  //Wire.setClock(400000);
+//  Wire.setClock(400000);
   TWBR = 24; // 400kHz I2C clock (200kHz if CPU is 8MHz)
 #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
   Fastwire::setup(400, true);
@@ -365,7 +366,7 @@ void setup() {
 #ifdef IR_RECIEVER
   //IR
   {
-    //PTLF("IR Receiver Button Decode");
+    PTLF("IR Receiver Button Decode");
     irrecv.enableIRIn(); // Start the receiver
   }
 #endif // IR_RECIEVER
@@ -374,11 +375,11 @@ void setup() {
 
   // servo
   { pwm.begin();
-    pwm.setOscillatorFrequency(20694050); 
-    pwm.setPWMFreq(50 * PWM_FACTOR); // Analog servos run at ~60 Hz updates
+    pwm.setOscillatorFrequency(26221085); 
+    pwm.setPWMFreq(60 * PWM_FACTOR); // Analog servos run at ~60 Hz updates
     delay(200);
 
-    //meow();
+    meow();
     strcpy(lastCmd, "rest");
     motion.loadBySkillName("rest");
     for (int8_t i = DOF - 1; i >= 0; i--) {
@@ -397,11 +398,10 @@ void setup() {
 
 #ifdef BATT  
   pinMode(BATT, INPUT);
-#endif BATT
-  pinMode(VCC, OUTPUT);
+#endif // BATT
   pinMode(TRIGGER, OUTPUT); // Sets the trigPin as an Output
   pinMode(ECHO, INPUT); // Sets the echoPin as an Input
-  digitalWrite(VCC, HIGH);
+
   int t = 0;
   int minDist, maxDist;
   /*while (0)*/ {//disabled for now. needs virtual threading to reduce lag in motion.
@@ -467,7 +467,7 @@ void loop() {
     // input block
     //else if (t == 0) {
 #ifdef IR_RECIEVER
-    if (irrecv.decode(&results)) {
+    if (irrecv.decode()) {
       String IRsig = translateIR();
       if (IRsig != "") {
         strcpy(newCmd, IRsig.c_str());
@@ -512,7 +512,6 @@ void loop() {
           behavior( 10, bList, speedRatio, pause);
           strcpy(newCmd, "rest");
           delete []bList;
-
         }
         else if (!strcmp(newCmd, "pu")) {
           char **bList = new char*[2];

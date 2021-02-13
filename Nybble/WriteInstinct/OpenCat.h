@@ -66,9 +66,9 @@
   SOFTWARE.
 
 */
-
+#define TRACE
 #include "Instinct.h" //postures and movements trained by RongzhongLi
-#define DEVELOPER
+//#define DEVELOPER
 #ifdef DEVELOPER
 #include <MemoryFree.h> //http://playground.arduino.cc/Code/AvailableMemory
 #include <QList.h> //https://github.com/SloCompTech/QList
@@ -87,16 +87,15 @@
 #define PTLF(s) Serial.println(F(s))
 
 //board configuration
-#define INTERRUPT 0
-//#define IR_RECIEVER 4 // Signal Pin of IR receiver to Arduino Digital Pin 4
-#define BUZZER 3
+#define INTERRUPT 3
+#define IR_RECIEVER 11 // Signal Pin of IR receiver to Arduino Digital Pin 11
+#define BUZZER 12
 #define GYRO
 #define ULTRA_SOUND
-//#define BATT A7
+#define BATT A0
 #undef BATT
 
 #ifdef ULTRA_SOUND
-#define VCC 8
 #define TRIGGER 5
 #define ECHO 4
 #define LONGEST_DISTANCE 200 // 200 cm = 2 meters
@@ -163,11 +162,11 @@ byte pins[] = {4, 3, 11, 12,
 byte pins[] = {14,// (0) Head Pan pin
                15,// (1) Head Tilt pin
                0, // (2) Tail Pan
-               3, // (3) Not Usedk
-               3, // (4) Shoulder Roll Front Left
-               3, // (5) Shoulder Roll Front Right
-               3, // (6) Shoulder Roll Hind Right
-               3, // (7) Shoulder Roll Hind Left
+               16, // (3) Not Used
+               16, // (4) Shoulder Roll Front Left (Not Used)
+               16, // (5) Shoulder Roll Front Right (Not Used)
+               16, // (6) Shoulder Roll Hind Right  (Not Used)
+               16, // (7) Shoulder Roll Hind Left (Not Used)
                8, // (8) Shoulder Pitch Front Left
                10, // (9) Shoulder Pitch Front Right
                4, // (10)Shoulder Pitch Hind Right
@@ -177,6 +176,22 @@ byte pins[] = {14,// (0) Head Pan pin
                5, // (14)Knee Hind Right
                7  // (15)Knee Hind Left
               };
+//byte pins[] = {2,
+//              3,
+//              4,
+//              5,
+//              10,
+//              14,
+//              11,
+//              15,
+//              8,
+//              12,
+//              9,
+//              13,
+//              6,
+//              7,
+//              0,
+//              1};
 #endif
 #endif
 
@@ -235,7 +250,7 @@ byte right[] = {
 
 //servo constants
 #define DOF 16
-#define PWM_FACTOR 0.79
+#define PWM_FACTOR 1
 #define MG92B_MIN 170*PWM_FACTOR
 #define MG92B_MAX 550*PWM_FACTOR
 #define MG92B_RANGE 150
@@ -334,8 +349,8 @@ int EEPROMReadInt(int p_address)
 #define DEVICE_ADDRESS 0x50    //I2C Address of AT24C32D eeprom chip
 #define WIRE_BUFFER 30 //Arduino wire allows 32 byte buffer, with 2 byte for address.
 #define WIRE_LIMIT 16 //That leaves 30 bytes for data. use 16 to balance each writes
-#define PAGE_LIMIT 32 //AT24C32D 32-byte Page Write Mode. Partial Page Writes Allowed
-#define EEPROM_SIZE (65536/8)
+#define PAGE_LIMIT 64 //AT24C128C 64-byte Page Write Mode. Partial Page Writes Allowed
+#define EEPROM_SIZE (262144/8)
 #define SKILL_HEADER 3
 
 bool EEPROMOverflow = false;
@@ -348,9 +363,11 @@ void copyDataFromPgmToI2cEeprom(unsigned int &eeAddress, unsigned int pgmAddress
     Wire.beginTransmission(DEVICE_ADDRESS);
     Wire.write((int)((eeAddress) >> 8));   // MSB
     Wire.write((int)((eeAddress) & 0xFF)); // LSB
-    /*PTF("\n* current address: ");
-      PTL((unsigned int)eeAddress);
-      PTLF("0\t1\t2\t3\t4\t5\t6\t7\t8\t9\ta\tb\tc\td\te\tf\t\n\t\t\t");*/
+#ifdef DEVELOPER
+    PTF("\n* current address: ");
+    PTL((unsigned int)eeAddress);
+    PTLF("0\t1\t2\t3\t4\t5\t6\t7\t8\t9\ta\tb\tc\td\te\tf\t\n\t\t\t");
+#endif
     byte writtenToWire = 0;
     do {
       if (eeAddress == EEPROM_SIZE) {
@@ -375,36 +392,6 @@ void copyDataFromPgmToI2cEeprom(unsigned int &eeAddress, unsigned int pgmAddress
   }
   //PTLF("finish copying to I2C EEPROM");
 }
-
-/*
-  class Skill {//the whole SkillList routine is replaced by Motion.loadBySkillName()
-  public:
-    char* skillName; //use char array instead of String to save memory
-    int onBoardEepromAddress;
-    Skill(char* name, int address): onBoardEepromAddress(address) {
-      skillName = new char[strlen(name) + 1];
-      strcpy(skillName, name);
-    }
-    void info() {
-      PTL("skill name: " + String(skillName) + ",\ton-board EEPROM address: " + String(onBoardEepromAddress));
-    }
-  };
-
-  class SkillList: public QList<Skill*> {//the whole SkillList routine is replaced by Motion.loadBySkillName()
-  public:
-    Skill* dict(char* key) {
-      PTL("search for " + String(key) + "\t");
-      for (byte idx = 0; idx < this->size(); idx++) {
-        PT(this->at(idx)->skillName);
-        PT(" ");
-        if (!strcmp(this->at(idx)->skillName, key))
-          return this->at(idx);
-      }
-      return (Skill*)NULL;
-    }
-  };
-  SkillList skillList;
-*/
 
 class Motion {
   public:
@@ -468,17 +455,17 @@ class Motion {
       int readFromEE = 0;
       int readToWire = 0;
       while (len > 0) {
-        //PTL("request " + String(min(WIRE_BUFFER, len)));
+        PTL("request " + String(min(WIRE_BUFFER, len)));
         Wire.requestFrom(DEVICE_ADDRESS, min(WIRE_BUFFER, len));
         readToWire = 0;
         do {
           if (Wire.available()) dutyAngles[readFromEE++] = Wire.read();
-          /*PT( (int8_t)dutyAngles[readFromEE - 1]);
-            PT('\t')*/
+          PT( (int8_t)dutyAngles[readFromEE - 1]);
+            PT('\t');
         } while (--len > 0 && ++readToWire < WIRE_BUFFER);
-        //PTL();
+        PTL();
       }
-      //PTLF("finish reading");
+      PTLF("finish reading");
     }
 
     void loadDataByOnboardEepromAddress(int onBoardEepromAddress) {
@@ -504,7 +491,7 @@ class Motion {
 #endif
     }
 
-    void loadBySkillName(char* skillName) {//get lookup information from on-board EEPROM and read the data array from storage
+    void loadBySkillName(const char* skillName) {//get lookup information from on-board EEPROM and read the data array from storage
       int onBoardEepromAddress = lookupAddressByName(skillName);
       if (onBoardEepromAddress == -1)
         return;

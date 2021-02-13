@@ -78,7 +78,7 @@ void saveSkillInfoFromProgmemToOnboardEeprom() {
       EEPROM.update(SKILLS + skillAddressShift++, skillNameWithType[s][l]);
     }
     PTL();
-    //PTL("Current EEPROM address is " + String(SKILLS + skillAddressShift));
+    PTL("Current EEPROM address is " + String(SKILLS + skillAddressShift));
 #ifdef I2C_EEPROM
     if (!EEPROMOverflow)
       if (skillNameWithType[s][len - 1] == 'I' && choice == 'Y') { //  if there's instinct and there's i2c eeprom, and user decide to update.
@@ -225,6 +225,7 @@ void setup() {
 
   // servo
   { pwm.begin();
+    pwm.setOscillatorFrequency(26221085); 
     pwm.setPWMFreq(60 * PWM_FACTOR); // Analog servos run at ~60 Hz updates
     delay(200);
     strcpy(lastCmd, "rest");
