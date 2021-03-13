@@ -87,13 +87,12 @@
 #define PTLF(s) Serial.println(F(s))
 
 //board configuration
-#define INTERRUPT 3
+#define INTERRUPT 0
 #define IR_RECIEVER 11 // Signal Pin of IR receiver to Arduino Digital Pin 11
 #define BUZZER 12
 #define GYRO
 #define ULTRA_SOUND
 #define BATT A0
-#undef BATT
 
 #ifdef ULTRA_SOUND
 #define TRIGGER 5
@@ -159,8 +158,8 @@ byte pins[] = {4, 3, 11, 12,
 //               8, 9, 10, 11,
 //               12, 13, 14, 15
 //              };
-byte pins[] = {14,// (0) Head Pan pin
-               15,// (1) Head Tilt pin
+byte pins[] = {15,// (0) Head Pan pin
+               14,// (1) Head Tilt pin
                0, // (2) Tail Pan
                16, // (3) Not Used
                16, // (4) Shoulder Roll Front Left (Not Used)
@@ -460,10 +459,14 @@ class Motion {
         readToWire = 0;
         do {
           if (Wire.available()) dutyAngles[readFromEE++] = Wire.read();
+#ifdef DEVELOPER
           PT( (int8_t)dutyAngles[readFromEE - 1]);
             PT('\t');
+#endif
         } while (--len > 0 && ++readToWire < WIRE_BUFFER);
+#ifdef DEVELOPER
         PTL();
+#endif
       }
       PTLF("finish reading");
     }

@@ -41,7 +41,8 @@
 // and the reading will be unpredictable. it should be replaced with previous reading to avoid jumping
 #define FIX_OVERFLOW
 //#endif
-#define HISTORY 2
+#define HISTORY 20
+#define AVERAGE_HISTORY
 int8_t lag = 0;
 float ypr[3];         // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 float yprLag[HISTORY][2];
@@ -185,7 +186,6 @@ void checkBodyMotion()  {
   if (mpuInterrupt || fifoCount >= packetSize)
   {
     if (mpuInterrupt)
-      Serial.println("Interrupt");
     // reset interrupt flag and get INT_STATUS byte
     mpuInterrupt = false;
     mpuIntStatus = mpu.getIntStatus();
@@ -229,10 +229,10 @@ void checkBodyMotion()  {
 #else
       ypr[1] = -ypr[1] ;
 #endif
+//      PT(ypr[1] * degPerRad);
+//      PTF("\t");
+//      PTL(ypr[2] * degPerRad);
 #endif
-      /*PT(ypr[1] * degPerRad);
-        PTF("\t");
-        PTL(ypr[2] * degPerRad);*/
       // overflow is detected after the ypr is read. it's necessary to keep a lag recrod of previous reading.  -- RzLi --
 #ifdef FIX_OVERFLOW
       for (byte g = 0; g < 2; g++) {
@@ -240,6 +240,16 @@ void checkBodyMotion()  {
         ypr[g + 1] = yprLag[(lag - 1 + HISTORY) % HISTORY][g] ;
       }
       lag = (lag + 1) % HISTORY;
+#ifdef AVERAGE_HISTORY
+      // Average over history
+      for (byte g = 0; g < 2; g++) {
+        long component = 0
+        for (int i = 0; i < HISTORY; i++) {
+          component += yprLag[i][g];
+        }
+        ypr[g] = component / HISTORY;
+      }
+#endif
 #endif
       // --
       //deal with accidents
@@ -693,7 +703,8 @@ void loop() {
     //motion block
     {
       if (token == 'k') {
-        if (jointIdx == DOF) {
+        if (true) {
+//        if (jointIdx == DOF) {
 #ifdef SKIP
           if (updateFrame++ == SKIP) {
             updateFrame = 0;
@@ -721,21 +732,23 @@ void loop() {
 #endif
         }
 
-        if (jointIdx < firstMotionJoint && motion.period > 1) {
-          calibratedPWM(jointIdx, (jointIdx != 1 ? offsetLR : 0) //look left or right
-                        + 10 * sin (timer * (jointIdx + 2) * M_PI / motion.period) //look around
-#ifdef GYRO
-                        + (checkGyro ? adjust(jointIdx) : 0)
-#endif
-                       );
-        }
-        else if (jointIdx >= firstMotionJoint) {
-          int dutyIdx = timer * WALKING_DOF + jointIdx - firstMotionJoint;
-          calibratedPWM(jointIdx, motion.dutyAngles[dutyIdx]
-#ifdef GYRO
-                        + adjust(jointIdx)
-#endif
-                       );
+        for (int localJointIdx = 0; localJointIdx < DOF; localJointIdx++) {
+          if (localJointIdx < firstMotionJoint && motion.period > 1) {
+            calibratedPWM(localJointIdx, (localJointIdx != 1 ? offsetLR : 0) //look left or right
+                          + 10 * sin (timer * (localJointIdx + 2) * M_PI / motion.period) //look around
+  #ifdef GYRO
+                          + (checkGyro ? adjust(localJointIdx) : 0)
+  #endif
+                         );
+          }
+          else if (localJointIdx >= firstMotionJoint) {
+            int dutyIdx = timer * WALKING_DOF + localJointIdx - firstMotionJoint;
+            calibratedPWM(localJointIdx, motion.dutyAngles[dutyIdx]
+  #ifdef GYRO
+                          + adjust(localJointIdx)
+  #endif
+                         );
+          }
         }
         jointIdx++;
       }
